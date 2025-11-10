@@ -105,8 +105,8 @@ loader.load(
   'kubus.glb',
   gltf => {
     model = gltf.scene;
-    model.position.set(0, 0, 0);
-    model.scale.set(2, 2, 2);
+    model.position.set(0, -0.5, 0);
+    model.scale.set(1, 1, 1);
     model.rotation.x = Math.PI / 2;
 
     // Tambahkan model ke marker
@@ -186,3 +186,4 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
