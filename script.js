@@ -1,5 +1,5 @@
-//Author: Ali Rohman, S.Kom., M.Kom
-//Dosen Pengampu MK: Pemodelan Geometrik
+// Author: Ali Rohman, S.Kom., M.Kom
+// Dosen Pengampu MK: Pemodelan Geometrik
 
 let scene, camera, renderer, arSource, arContext, markerRoot, model, rotationGizmo;
 let isDragging = false;
@@ -12,17 +12,7 @@ const scaleValue = document.getElementById('scaleValue');
 // === Buat tombol toggle gizmo ===
 const toggleBtn = document.createElement("button");
 toggleBtn.textContent = "👁️ Tampilkan Sumbu";
-toggleBtn.style.position = "absolute";
-toggleBtn.style.top = "20px";
-toggleBtn.style.left = "50%";
-toggleBtn.style.transform = "translateX(-50%)";
-toggleBtn.style.padding = "8px 16px";
-toggleBtn.style.border = "none";
-toggleBtn.style.borderRadius = "8px";
-toggleBtn.style.background = "rgba(0, 0, 0, 0.6)";
-toggleBtn.style.color = "white";
-toggleBtn.style.fontFamily = "sans-serif";
-toggleBtn.style.cursor = "pointer";
+toggleBtn.classList.add("toggle-gizmo"); // gunakan styling dari CSS
 document.body.appendChild(toggleBtn);
 
 // === Inisialisasi scene & kamera ===
@@ -34,25 +24,33 @@ scene.add(camera);
 renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.width = "100vw";
+renderer.domElement.style.height = "100vh";
 document.body.appendChild(renderer.domElement);
 
-// === AR Source (kamera webcam) ===
+// === AR Source (kamera webcam / HP) ===
 arSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
 arSource.init(() => {
   setTimeout(() => {
-    arSource.onResizeElement();
-    arSource.copyElementSizeTo(renderer.domElement);
+    onResize();
   }, 2000);
 });
 
-// === Resize handler ===
-window.addEventListener('resize', () => {
+// === Fungsi resize responsif ===
+function onResize() {
   arSource.onResizeElement();
   arSource.copyElementSizeTo(renderer.domElement);
-  if (arContext.arController !== null) {
+  if (arContext && arContext.arController) {
     arSource.copyElementSizeTo(arContext.arController.canvas);
   }
-});
+}
+
+// === Event listener resize ===
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
 
 // === AR Context (kalibrasi kamera) ===
 arContext = new THREEx.ArToolkitContext({
@@ -85,28 +83,18 @@ scene.add(ambientLight);
 function createRotationGizmo(radius = 1.5, tube = 0.008) {
   const gizmo = new THREE.Group();
 
-  // X (merah)
-  const torusX = new THREE.Mesh(
-    new THREE.TorusGeometry(radius, tube, 8, 100),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
-  );
-  torusX.rotation.y = Math.PI / 2;
-  gizmo.add(torusX);
+  const createTorus = (color, rotation) => {
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, tube, 8, 100),
+      new THREE.MeshBasicMaterial({ color })
+    );
+    if (rotation) torus.rotation.copy(rotation);
+    return torus;
+  };
 
-  // Y (hijau)
-  const torusY = new THREE.Mesh(
-    new THREE.TorusGeometry(radius, tube, 8, 100),
-    new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-  );
-  gizmo.add(torusY);
-
-  // Z (biru)
-  const torusZ = new THREE.Mesh(
-    new THREE.TorusGeometry(radius, tube, 8, 100),
-    new THREE.MeshBasicMaterial({ color: 0x0000ff })
-  );
-  torusZ.rotation.x = Math.PI / 2;
-  gizmo.add(torusZ);
+  gizmo.add(createTorus(0xff0000, new THREE.Euler(0, Math.PI / 2, 0))); // X - merah
+  gizmo.add(createTorus(0x00ff00)); // Y - hijau
+  gizmo.add(createTorus(0x0000ff, new THREE.Euler(Math.PI / 2, 0, 0))); // Z - biru
 
   return gizmo;
 }
@@ -124,9 +112,9 @@ loader.load(
     // Tambahkan model ke marker
     markerRoot.add(model);
 
-    // Tambahkan gizmo rotasi di sekitar model
+    // Tambahkan gizmo rotasi
     rotationGizmo = createRotationGizmo(1.5, 0.008);
-    rotationGizmo.visible = false; // default: disembunyikan
+    rotationGizmo.visible = false;
     model.add(rotationGizmo);
 
     console.log("✅ Model & gizmo rotasi berhasil dimuat!");
@@ -158,22 +146,38 @@ renderer.domElement.addEventListener('mousedown', e => {
   prevMouse.y = e.clientY;
 });
 
-renderer.domElement.addEventListener('mouseup', () => {
-  isDragging = false;
-});
+renderer.domElement.addEventListener('mouseup', () => (isDragging = false));
 
 renderer.domElement.addEventListener('mousemove', e => {
   if (!isDragging || !model) return;
-
   const deltaX = e.clientX - prevMouse.x;
   const deltaY = e.clientY - prevMouse.y;
-
   model.rotation.y += deltaX * 0.01;
   model.rotation.x += deltaY * 0.01;
-
   prevMouse.x = e.clientX;
   prevMouse.y = e.clientY;
 });
+
+// === Tambahkan dukungan kontrol rotasi sentuh (HP) ===
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    prevMouse.x = e.touches[0].clientX;
+    prevMouse.y = e.touches[0].clientY;
+  }
+});
+
+renderer.domElement.addEventListener('touchmove', e => {
+  if (!isDragging || !model || e.touches.length !== 1) return;
+  const deltaX = e.touches[0].clientX - prevMouse.x;
+  const deltaY = e.touches[0].clientY - prevMouse.y;
+  model.rotation.y += deltaX * 0.01;
+  model.rotation.x += deltaY * 0.01;
+  prevMouse.x = e.touches[0].clientX;
+  prevMouse.y = e.touches[0].clientY;
+});
+
+renderer.domElement.addEventListener('touchend', () => (isDragging = false));
 
 // === Animasi utama ===
 function animate() {
